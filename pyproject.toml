@@ -1,0 +1,10 @@
+[project]
+name = "sweetiepy"
+version = "0.1.0"
+description = "A library for accessing DIY loop data from a MongoDB database"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "pymongo>=4.10.1",
+    "ruff>=0.9.2",
+]
