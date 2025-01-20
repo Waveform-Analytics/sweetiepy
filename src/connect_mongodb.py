@@ -1,6 +1,8 @@
-from data.mongo_connection import MongoConnection
-from data.glucose_readings_repository import GlucoseReadingsRepository
 from data.device_status_repository import DeviceStatusRepository
+from data.glucose_readings_repository import GlucoseReadingsRepository
+from data.mongo_connection import MongoConnection
+from data.profile_repository import ProfileRepository
+from data.treatments_repository import TreatmentsRepository
 
 
 class DiabetesDataService:
@@ -20,6 +22,8 @@ class DiabetesDataService:
         """
         self.glucose_repo = GlucoseReadingsRepository(connection)
         self.device_repo = DeviceStatusRepository(connection)
+        self.profile_repo = ProfileRepository(connection)
+        self.treatments_repo = TreatmentsRepository(connection)
 
     def get_glucose_readings(self, start_time: str = None, end_time: str = None):
         """
@@ -30,14 +34,13 @@ class DiabetesDataService:
         are provided, the most recent two weeks of readings are retrieved.
 
         Args:
-            start_time: The starting point of the time range in ISO 8601 format.
+            start_time (str, optional): The starting point of the time range in ISO 8601 format.
                 If None, the start time is not limited.
-            end_time: The ending point of the time range in ISO 8601 format.
+            end_time (str, optional): The ending point of the time range in ISO 8601 format.
                 If None, the end time is not limited.
 
         Returns:
             List[Dict]: A list of dictionaries containing glucose reading data.
-
         """
         return self.glucose_repo.get_glucose_readings(start_time, end_time)
 
@@ -50,15 +53,53 @@ class DiabetesDataService:
         most recent 2 weeks of device status data.
 
         Args:
-            start_time: The starting point of the time range in ISO 8601 format.
+            start_time (str, optional): The starting point of the time range in ISO 8601 format.
                 If None, the start time is not limited.
-            end_time: The ending point of the time range in ISO 8601 format.
+            end_time (str, optional): The ending point of the time range in ISO 8601 format.
                 If None, the end time is not limited.
 
         Returns:
-            The status of the device for the specified time range.
+            List[Dict]: A list of dictionaries containing device status data for the specified time range.
         """
         return self.device_repo.get_device_status(start_time, end_time)
+
+    def get_profiles(self, start_time: str = None, end_time: str = None):
+        """
+        Fetch profile data within the specified time range.
+
+        This method retrieves profiles from the profile repository,
+        optionally filtered by a defined start and/or end time. If no time range 
+        is provided, the repository default behavior will be used.
+
+        Args:
+            start_time (str, optional): The starting point of the time range in ISO 8601 format.
+                If None, the start time is not limited.
+            end_time (str, optional): The ending point of the time range in ISO 8601 format.
+                If None, the end time is not limited.
+
+        Returns:
+            List[Dict]: A list of dictionaries containing profile data.
+        """
+        return self.profile_repo.get_profiles(start_time, end_time)
+
+    def get_treatments(self, start_time: str = None, end_time: str = None):
+        """
+        Fetch treatment data within the specified time range.
+
+        This method retrieves treatments from the treatments repository,
+        optionally filtered by a defined start and/or end time. If no time range 
+        is provided, the repository default behavior will be used.
+
+        Args:
+            start_time (str, optional): The starting point of the time range in ISO 8601 format.
+                If None, the start time is not limited.
+            end_time (str, optional): The ending point of the time range in ISO 8601 format.
+                If None, the end time is not limited.
+
+        Returns:
+            List[Dict]: A list of dictionaries containing treatment data.
+        """
+        return self.treatments_repo.get_treatments(start_time, end_time)
 
 
 def main():

@@ -46,12 +46,23 @@ def main():
         for status in device_statuses:
             print(status)
 
+        # Fetch and display profile data
+        print("\nFetching profile data...")
+        profiles = service.get_profiles()
+        for profile in profiles:
+            print(profile)
+
+        # Fetch and display treatment data
+        print("\nFetching treatments...")
+        treatments = service.get_treatments()
+        for treatment in treatments:
+            print(treatment)
+
         print('pause here')
 
     except Exception as error:
         print(f"Error encountered: {error}")
     finally:
-        # Ensure the connection is always closed
         connection.close()
 
 
