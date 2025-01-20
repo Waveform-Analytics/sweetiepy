@@ -1,121 +1,102 @@
-from datetime import datetime, timedelta
-from pymongo import MongoClient
-from pymongo.server_api import ServerApi
+from data.mongo_connection import MongoConnection
+from data.glucose_readings_repository import GlucoseReadingsRepository
+from data.device_status_repository import DeviceStatusRepository
 
 
-class DatabaseConnection:
-    def __init__(self, uri: str, username: str, password: str):
-        """
-        Initialize the database connection.
+class DiabetesDataService:
+    """
+    A service layer that acts as a unified interface for interacting with glucose readings
+    and device status data, using the underlying repository pattern.
+    """
 
-        :param uri: MongoDB connection URI with placeholders for <db_username> and <db_password>
-        :param username: Username for authentication
-        :param password: Password for authentication
+    def __init__(self, connection: MongoConnection):
         """
-        self.uri = uri.replace("<db_username>", username).replace("<db_password>", password)
-        self.client = None
-        self.db = None
+        Initializes the class and sets up repositories for glucose readings and device status
+        using the provided database connection.
 
-    def connect(self):
+        Args:
+            connection (MongoConnection): The database connection used to initialize the
+                repositories.
         """
-        Establish a connection to the MongoDB database.
-        """
-        try:
-            self.client = MongoClient(self.uri, server_api=ServerApi('1'))
-            # Hardcode the database name as 'myCGMitc'
-            self.db = self.client["myCGMitc"]
-            print(f"Connected to database: myCGMitc")
-        except Exception as e:
-            raise RuntimeError(f"Failed to connect to MongoDB: {e}")
-
-    def close(self):
-        """
-        Close the connection to the database.
-        """
-        if self.client:
-            self.client.close()
-            print("Connection closed.")
+        self.glucose_repo = GlucoseReadingsRepository(connection)
+        self.device_repo = DeviceStatusRepository(connection)
 
     def get_glucose_readings(self, start_time: str = None, end_time: str = None):
         """
-        Retrieve glucose readings (CGM values) from the `myCGMitc.entries` collection.
+        Fetch glucose readings within the specified time range.
 
-        :param start_time: Start time for the query (in ISO 8601 format: yyyy-mm-ddTHH:MM:SS),
-                           optional, defaults to two weeks ago.
-        :param end_time: End time for the query (in ISO 8601 format: yyyy-mm-ddTHH:MM:SS),
-                         optional, defaults to the current time.
-        :return: A list of dictionaries with keys: 'sgv', 'dateString', 'trend', 'direction'.
+        This method retrieves glucose readings from the glucose repository,
+        optionally filtered by a defined start and/or end time. If no time range is
+        are provided, the most recent two weeks of readings are retrieved.
 
-        Example Output:
-        [
-            {"sgv": 110, "dateString": "2023-10-01T12:34:56.000Z", "trend": 4, "direction": "Flat"},
-            ...
-        ]
+        Args:
+            start_time: The starting point of the time range in ISO 8601 format.
+                If None, the start time is not limited.
+            end_time: The ending point of the time range in ISO 8601 format.
+                If None, the end time is not limited.
+
+        Returns:
+            List[Dict]: A list of dictionaries containing glucose reading data.
+
         """
-        if self.db is None:
-            raise RuntimeError("Database not connected. Call `connect` first.")
+        return self.glucose_repo.get_glucose_readings(start_time, end_time)
 
-        # Default to the most recent two weeks
-        if not end_time:
-            end_time = datetime.utcnow()  # Current UTC time
-        else:
-            try:
-                end_time = datetime.fromisoformat(end_time.replace("Z", "+00:00"))
-            except ValueError:
-                raise ValueError("Invalid end_time format. Use ISO 8601 format (e.g., 2023-10-01T12:34:56Z).")
-
-        if not start_time:
-            start_time = end_time - timedelta(weeks=2)  # 2 weeks before the end time
-        else:
-            try:
-                start_time = datetime.fromisoformat(start_time.replace("Z", "+00:00"))
-            except ValueError:
-                raise ValueError("Invalid start_time format. Use ISO 8601 format (e.g., 2023-10-01T12:34:56Z).")
-
-        # Validate that start_time is before end_time
-        if start_time >= end_time:
-            raise ValueError("Start time must be earlier than end time.")
-
-        # Query preparation
-        query = {
-            "date": {"$gte": start_time.timestamp() * 1000, "$lte": end_time.timestamp() * 1000}
-            # Dates in milliseconds
-        }
-        fields = {
-            "_id": 0,  # Exclude the MongoDB ID
-            "sgv": 1,  # Blood glucose value
-            "dateString": 1,  # ISO 8601 formatted timestamp
-            "trend": 1,  # Integer trend value (e.g., 4 = Flat)
-            "direction": 1  # Text trend direction (e.g., "Flat")
-        }
-
-        try:
-            # Perform the query with filters and projections
-            results = list(self.db["entries"].find(query, fields))  # Access the 'entries' collection
-            return results
-        except Exception as e:
-            raise RuntimeError(f"Failed to retrieve glucose readings: {e}")
-
-    def get_device_status(self):
+    def get_device_status(self, start_time: str = None, end_time: str = None):
         """
-        Retrieve device status data from the `myCGMitc.device_status` collection.
+        Retrieves the status of the device for a specified time range.
 
-        Example: Device-specific settings, battery status, etc.
-        """
-        if not self.db:
-            raise RuntimeError("Database not connected. Call `connect` first.")
-        return list(self.db["device_status"].find({}, {"_id": 0}))
+        This method fetches the device status from the repository using the
+        given time range. If no time range is provided, it retrieves the
+        most recent 2 weeks of device status data.
 
-    def get_settings(self):
-        """
-        Retrieve user/Loop system settings from the `myCGMitc.settings` collection.
+        Args:
+            start_time: The starting point of the time range in ISO 8601 format.
+                If None, the start time is not limited.
+            end_time: The ending point of the time range in ISO 8601 format.
+                If None, the end time is not limited.
 
-        Example: This may include basal rate configurations, carb ratios, etc.
+        Returns:
+            The status of the device for the specified time range.
         """
-        if not self.db:
-            raise RuntimeError("Database not connected. Call `connect` first.")
-        return list(self.db["settings"].find({}, {"_id": 0}))
+        return self.device_repo.get_device_status(start_time, end_time)
+
+
+def main():
+    """
+    Example usage of the DiabetesDataService, demonstrating how a user might interact
+    with this module.
+    """
+    # Database connection configuration
+    uri = "mongodb+srv://<db_username>:<db_password>@cluster.example.com"
+    username = "username"  # Replace with actual username
+    password = "password"  # Replace with actual password
+
+    # Initialize the database connection
+    connection = MongoConnection(uri, username, password)
+    connection.connect()  # Establish the connection
+
+    try:
+        # Initialize the service layer
+        service = DiabetesDataService(connection)
+
+        # Fetch and display glucose readings
+        print("Fetching glucose readings...")
+        glucose_readings = service.get_glucose_readings()
+        for reading in glucose_readings:
+            print(reading)
+
+        # Fetch and display device statuses
+        print("\nFetching device statuses...")
+        device_statuses = service.get_device_status()
+        for status in device_statuses:
+            print(status)
+
+    except Exception as e:
+        print(f"An error occurred: {e}")
+    finally:
+        # Always close the database connection
+        connection.close()
 
 
 if __name__ == "__main__":
-    print("This script is intended to be imported as a library.")
+    main()
