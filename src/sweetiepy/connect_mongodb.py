@@ -1,8 +1,8 @@
-from data.device_status_repository import DeviceStatusRepository
-from data.glucose_readings_repository import GlucoseReadingsRepository
-from data.mongo_connection import MongoConnection
-from data.profile_repository import ProfileRepository
-from data.treatments_repository import TreatmentsRepository
+from sweetiepy.data.device_status_repository import DeviceStatusRepository
+from sweetiepy.data.glucose_readings_repository import GlucoseReadingsRepository
+from sweetiepy.data.mongo_connection import MongoConnection
+from sweetiepy.data.profile_repository import ProfileRepository
+from sweetiepy.data.treatments_repository import TreatmentsRepository
 
 
 class DiabetesDataService:

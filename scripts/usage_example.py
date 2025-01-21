@@ -1,5 +1,5 @@
 import os
-from connect_mongodb import MongoConnection, DiabetesDataService
+from sweetiepy.connect_mongodb import MongoConnection, DiabetesDataService
 
 
 def main():
