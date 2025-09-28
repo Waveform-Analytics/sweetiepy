@@ -7,6 +7,19 @@ wheels/
 *.egg-info
 
 # Virtual environments
-.venv
+.venv/
+.env
 
-/.idea
+# IDE and editor files
+.idea/
+
+# Package publishing
+.pypirc
+
+# OS files
+.DS_Store
+
+# Development files
+dev/**/*.png
+
+
