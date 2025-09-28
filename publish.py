@@ -25,7 +25,7 @@ def main():
     env['TWINE_PASSWORD'] = token
     
     # Run twine upload
-    cmd = ['twine', 'upload', 'dist/loopy_basic-0.2.0*']
+    cmd = ['twine', 'upload', 'dist/sweetiepy-1.0.0*']
     result = subprocess.run(cmd, env=env)
     
     if result.returncode == 0:
