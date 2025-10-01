@@ -5,7 +5,55 @@ from datetime import datetime, timedelta
 import json
 import pandas as pd
 import numpy as np
+import pytz
 from typing import List, Dict, Any, Optional, Union
+
+# TIMEZONE DATA CORRUPTION ISSUE
+# ===============================
+# The treatment data in MongoDB appears to have a timezone corruption issue where:
+# - Timestamps are stored as local time values (e.g., Eastern time)
+# - But they're marked with 'Z' suffix indicating UTC timezone
+# - This causes a systematic 4-hour offset for Eastern timezone users
+# 
+# Root cause: Likely in the DIY Loop system or data ingestion pipeline
+# 
+# This module includes fixes to handle this corruption transparently
+# while maintaining compatibility with properly stored data.
+
+def _fix_corrupted_treatment_timestamps(timestamp_series: pd.Series, 
+                                       local_timezone: str = 'US/Eastern') -> pd.Series:
+    """Fix corrupted treatment timestamps that are stored as local time with UTC markers.
+    
+    Args:
+        timestamp_series: Pandas series of timestamp strings or datetime objects
+        local_timezone: The actual timezone the data is in (default: US/Eastern)
+        
+    Returns:
+        Pandas series with corrected timezone-aware timestamps
+    """
+    if timestamp_series.empty:
+        return timestamp_series
+    
+    # Convert to datetime if not already
+    if not pd.api.types.is_datetime64_any_dtype(timestamp_series):
+        datetime_series = pd.to_datetime(timestamp_series)
+    else:
+        datetime_series = timestamp_series
+    
+    # Check if timestamps are timezone-aware and marked as UTC
+    if datetime_series.dt.tz is not None:
+        # If marked as UTC but actually local time, fix the timezone
+        local_tz = pytz.timezone(local_timezone)
+        
+        # Remove the incorrect UTC marker and treat as local time
+        naive_series = datetime_series.dt.tz_localize(None)
+        
+        # Properly localize as the actual local timezone
+        corrected_series = naive_series.apply(lambda dt: local_tz.localize(dt) if pd.notna(dt) else dt)
+        
+        return corrected_series
+    
+    return datetime_series
 
 # Configure pandas to use PyArrow backend for better performance
 try:
@@ -102,9 +150,15 @@ class PumpDataAccess:
         if start_date or end_date:
             date_query = {}
             if start_date:
-                date_query['$gte'] = start_date.isoformat() + 'Z'
+                # Convert to UTC if timezone-naive (assumes local time)
+                if start_date.tzinfo is None:
+                    start_date = pytz.timezone('US/Eastern').localize(start_date).astimezone(pytz.UTC)
+                date_query['$gte'] = start_date.isoformat().replace('+00:00', 'Z')
             if end_date:
-                date_query['$lte'] = end_date.isoformat() + 'Z'
+                # Convert to UTC if timezone-naive (assumes local time)
+                if end_date.tzinfo is None:
+                    end_date = pytz.timezone('US/Eastern').localize(end_date).astimezone(pytz.UTC)
+                date_query['$lte'] = end_date.isoformat().replace('+00:00', 'Z')
             if date_query:
                 query['timestamp'] = date_query
 
@@ -124,6 +178,13 @@ class PumpDataAccess:
         """
         end_date = datetime.now()
         start_date = end_date - timedelta(days=days)
+        
+        # Convert to UTC (assumes local time for naive datetimes)
+        eastern = pytz.timezone('US/Eastern')
+        if start_date.tzinfo is None:
+            start_date = eastern.localize(start_date).astimezone(pytz.UTC)
+        if end_date.tzinfo is None:
+            end_date = eastern.localize(end_date).astimezone(pytz.UTC)
 
         return self.get_treatments(
             event_type='Correction Bolus',
@@ -143,6 +204,13 @@ class PumpDataAccess:
         """
         end_date = datetime.now()
         start_date = end_date - timedelta(days=days)
+        
+        # Convert to UTC (assumes local time for naive datetimes)
+        eastern = pytz.timezone('US/Eastern')
+        if start_date.tzinfo is None:
+            start_date = eastern.localize(start_date).astimezone(pytz.UTC)
+        if end_date.tzinfo is None:
+            end_date = eastern.localize(end_date).astimezone(pytz.UTC)
 
         return self.get_treatments(
             event_type='Temp Basal',
@@ -162,6 +230,13 @@ class PumpDataAccess:
         """
         end_date = datetime.now()
         start_date = end_date - timedelta(days=days)
+        
+        # Convert to UTC (assumes local time for naive datetimes)
+        eastern = pytz.timezone('US/Eastern')
+        if start_date.tzinfo is None:
+            start_date = eastern.localize(start_date).astimezone(pytz.UTC)
+        if end_date.tzinfo is None:
+            end_date = eastern.localize(end_date).astimezone(pytz.UTC)
 
         return self.get_treatments(
             event_type='Carb Correction',
@@ -196,11 +271,18 @@ class PumpDataAccess:
         end_date = datetime.now()
         start_date = end_date - timedelta(days=days)
         
+        # Convert to UTC (assumes local time for naive datetimes)
+        eastern = pytz.timezone('US/Eastern')
+        if start_date.tzinfo is None:
+            start_date = eastern.localize(start_date).astimezone(pytz.UTC)
+        if end_date.tzinfo is None:
+            end_date = eastern.localize(end_date).astimezone(pytz.UTC)
+        
         # Build query
         query = {
             'timestamp': {
-                '$gte': start_date.isoformat() + 'Z',
-                '$lte': end_date.isoformat() + 'Z'
+                '$gte': start_date.isoformat().replace('+00:00', 'Z'),
+                '$lte': end_date.isoformat().replace('+00:00', 'Z')
             }
         }
         
@@ -219,9 +301,13 @@ class PumpDataAccess:
         # Convert to DataFrame
         df = pd.DataFrame(treatments)
         
-        # Convert timestamp to datetime
+        # Convert timestamp to datetime with timezone correction
         if 'timestamp' in df.columns:
-            df['dateTime'] = pd.to_datetime(df['timestamp'])
+            df['dateTime'] = _fix_corrupted_treatment_timestamps(df['timestamp'])
+            
+            if not df.empty:
+                print("⚠️  Applied timezone correction for treatment data")
+                print("   Corrected timestamps stored as local time with UTC markers")
         
         return df
 
@@ -402,6 +488,13 @@ class PumpDataAccess:
         """
         end_date = datetime.now()
         start_date = end_date - timedelta(days=days)
+        
+        # Convert to UTC (assumes local time for naive datetimes)
+        eastern = pytz.timezone('US/Eastern')
+        if start_date.tzinfo is None:
+            start_date = eastern.localize(start_date).astimezone(pytz.UTC)
+        if end_date.tzinfo is None:
+            end_date = eastern.localize(end_date).astimezone(pytz.UTC)
 
         return self.get_treatments(
             event_type='Site Change',

@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "sweetiepy"
-version = "1.0.0"
+version = "1.0.1"
 description = "Type 1 Diabetes Data Analysis from DIY Loop system"
 authors = [{name = "Michelle Weirathmueller", email = "info@waveformanalytics.com"}]
 readme = "README.md"
@@ -20,6 +20,7 @@ dependencies = [
     "pymongo>=4.13.2",
     "python-dateutil>=2.9.0.post0",
     "python-dotenv>=1.1.1",
+    "pytz>=2024.1",
 ]
 
 [tool.hatch.build.targets.wheel]
@@ -29,6 +30,7 @@ packages = ["src/sweetiepy"]
 dev = [
     "build>=1.3.0",
     "hatchling>=1.27.0",
+    "twine>=6.1.0",
 ]
 
 [project.optional-dependencies]
